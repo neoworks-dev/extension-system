@@ -75,7 +75,10 @@ interface EffectRunner<T> {
   getOuterStack: () => string[]
 }
 
-export const enum FiberState {
+// a plain enum, not `const enum`: this is part of the public API, and ambient
+// const enums are unusable from projects with `isolatedModules` /
+// `verbatimModuleSyntax` enabled — which is every Vite-based project.
+export enum FiberState {
   PENDING,
   LOADING,
   ACTIVE,

@@ -79,4 +79,5 @@ Composability* ([arXiv:2608.25512](https://arxiv.org/abs/2608.25512)).
 Changes from upstream: flattened from a monorepo package to a standalone package; `cosmokit`
 and `@standard-schema/spec` vendored into `src/std.ts` and `src/schema.ts` to remove all runtime
 dependencies; yarn/yakumo/eslint replaced with bun/oxlint; the loader CLI (`bin.js`) dropped,
-since it depended on `@cordisjs/plugin-loader`.
+since it depended on `@cordisjs/plugin-loader`; `FiberState` and `LoggerLevel` changed from
+`const enum` to plain `enum` so they are usable under `isolatedModules`.

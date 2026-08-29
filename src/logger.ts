@@ -15,7 +15,8 @@ export type LoggerMethod = (format: any, ...param: any[]) => void
 
 export type Formatter = (value: any, exporter: Exporter, message: Message) => any
 
-export const enum LoggerLevel {
+// plain enum for the same reason as `FiberState` — see src/fiber.ts
+export enum LoggerLevel {
   ERROR = 0,
   WARN = 1,
   INFO = 2,
