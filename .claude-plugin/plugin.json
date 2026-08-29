@@ -6,7 +6,7 @@
     "name": "Moritz Utcke",
     "email": "moritz.utcke@ib-cornelsen.de"
   },
-  "homepage": "https://github.com/neoworks/extension-system",
-  "repository": "https://github.com/neoworks/extension-system",
+  "homepage": "https://github.com/neoworks-dev/extension-system",
+  "repository": "https://github.com/neoworks-dev/extension-system",
   "license": "MIT"
 }

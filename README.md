@@ -53,7 +53,7 @@ the npm package alone does not make the skill available. Pick one:
 **Install as a plugin** (recommended — the repo is also a marketplace):
 
 ```sh
-/plugin marketplace add neoworks/extension-system
+/plugin marketplace add neoworks-dev/extension-system
 /plugin install neoworks@neoworks
 ```
 

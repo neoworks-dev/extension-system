@@ -5,6 +5,14 @@
   "type": "module",
   "sideEffects": false,
   "license": "MIT",
+  "homepage": "https://github.com/neoworks-dev/extension-system",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neoworks-dev/extension-system.git"
+  },
+  "bugs": {
+    "url": "https://github.com/neoworks-dev/extension-system/issues"
+  },
   "main": "./lib/index.js",
   "types": "./lib/index.d.ts",
   "exports": {
