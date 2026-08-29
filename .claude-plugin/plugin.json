@@ -1,0 +1,12 @@
+{
+  "name": "neoworks",
+  "description": "Plugin-authoring guidance for @neoworks/extension-system — revertible effects, reactive dependency resolution, and the fiber lifecycle.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Moritz Utcke",
+    "email": "moritz.utcke@ib-cornelsen.de"
+  },
+  "homepage": "https://github.com/neoworks/extension-system",
+  "repository": "https://github.com/neoworks/extension-system",
+  "license": "MIT"
+}

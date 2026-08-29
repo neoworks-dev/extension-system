@@ -44,6 +44,37 @@ changes, not on every unrelated context change.
 Plugin config is validated through [Standard Schema](https://standardschema.dev), so zod,
 valibot and arktype all work as-is. Async validation is not supported.
 
+## Agent skill
+
+This repo ships a Claude Code skill teaching plugin authoring against this API
+(`skills/extension-system/SKILL.md`). Claude Code does **not** scan `node_modules`, so installing
+the npm package alone does not make the skill available. Pick one:
+
+**Install as a plugin** (recommended — the repo is also a marketplace):
+
+```sh
+/plugin marketplace add neoworks/extension-system
+/plugin install neoworks@neoworks
+```
+
+Then invoke with `/neoworks:extension-system`, or let Claude load it automatically when it sees
+this package imported.
+
+**Point at it locally**, without installing:
+
+```sh
+claude --plugin-dir ./node_modules/@neoworks/extension-system
+```
+
+**Vendor it into a consuming project**, if you'd rather it be checked in there:
+
+```sh
+mkdir -p .claude/skills
+cp -r node_modules/@neoworks/extension-system/skills/extension-system .claude/skills/
+```
+
+The skill directory is included in the npm tarball, so all three work from a plain install.
+
 ## Development
 
 ```sh

@@ -17,7 +17,9 @@
   },
   "files": [
     "lib",
-    "src"
+    "src",
+    "skills",
+    ".claude-plugin"
   ],
   "scripts": {
     "build": "bun run clean && bun run build:js && bun run build:types",
