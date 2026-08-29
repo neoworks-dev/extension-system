@@ -1,6 +1,6 @@
 ---
 name: extension-system
-description: How to write plugins and services for @neoworks/extension-system — the plugin kernel with revertible effects and reactive dependency resolution. Use whenever writing, reviewing, or debugging code that imports Context, Service, or Fiber from @neoworks/extension-system, or when working inside that repo. Covers ctx.effect, inject/provide, the fiber lifecycle, the five event dispatch modes, isolate/intercept, and the mistakes that silently break unloading.
+description: How to write plugins and services for @neoworks/extension-system — the plugin kernel with revertible effects and reactive dependency resolution. Use whenever writing, reviewing, or debugging code that imports Context, Service, or Fiber from @neoworks/extension-system. Covers ctx.effect, inject/provide, the fiber lifecycle, the five event dispatch modes, isolate/intercept, and the mistakes that silently break unloading.
 ---
 
 `@neoworks/extension-system` is a plugin kernel. Two ideas carry everything:
@@ -264,23 +264,19 @@ cache a resolved service in a module-level variable — read it off `ctx` each t
 call `ctx.provide(name, ...)`; you'll get
 `service "name" has been registered at <...>`.
 
-**Naming a property with a leading underscore on a context or tracked service.** Properties that
-are symbols, numeric strings, `prototype`, `then`, or `_`-prefixed bypass the proxy entirely
-(`src/reflect.ts:33`). That's load-bearing internally — don't rename around it, and don't expect
-proxy semantics on such properties.
+**Expecting proxy semantics on every property.** Properties that are symbols, numeric strings,
+`prototype`, `then`, or `_`-prefixed bypass the context proxy entirely — no inject check, no
+service resolution, no tracing. Don't name a service key or a public service member that way.
 
 **Assuming a flat key namespace is safe.** Linking is by key name only, with no structural or
 version check. Two providers claiming the same key is an error at registration, but a *consumer*
 compiled against an older interface will bind happily and fail at runtime. Pick a naming
 convention before third-party plugins can `provide`.
 
-## Testing
-
-Tests run on **vitest**, not `bun test` — bun's fake timers don't intercept `setTimeout`, and the
-fiber tests need `vi.advanceTimersByTimeAsync` to drive the inertia lock.
+## Testing a plugin
 
 ```ts
-import { Context, FiberState } from '../src'
+import { Context, FiberState } from '@neoworks/extension-system'
 
 const root = new Context()
 const fiber = root.plugin(MyPlugin)
@@ -297,16 +293,3 @@ await fiber.dispose()
 The standard assertion for correct plugin authoring: **mount, unmount, and check that observable
 state is exactly what it was before mounting.** If something is left behind, an effect is missing
 its inverse.
-
-## Repo commands
-
-```sh
-bun run test        # vitest
-bun run typecheck   # tsc --noEmit
-bun run lint        # oxlint
-bun run build       # bun build → lib/index.js, tsc → lib/*.d.ts
-```
-
-Do not "fix" the lint exemptions in `.oxlintrc.json` — `no-underscore-dangle`,
-`unicorn/no-thenable`, `no-this-alias` and `no-await-in-loop` are disabled because the kernel
-depends on exactly those patterns. Reasoning is in `README.md`.
