@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "es2024",
+    "lib": ["es2024", "dom"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["node"],
+
+    // relaxations inherited from upstream — the proxy/reflect machinery
+    // in src/reflect.ts and src/utils.ts does not typecheck without them
+    "noImplicitAny": false,
+    "noImplicitThis": false,
+    "strictFunctionTypes": false
+  },
+  "include": ["src", "tests"]
+}

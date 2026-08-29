@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript"],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "es2024": true,
+    "node": true,
+    "browser": true
+  },
+  "ignorePatterns": ["lib", "node_modules"],
+  "rules": {
+    "no-empty": ["error", { "allowEmptyCatch": true }],
+    "no-unused-vars": ["error", { "args": "none", "varsIgnorePattern": "^_" }],
+    "typescript/no-explicit-any": "off",
+    "typescript/no-namespace": "off",
+    "typescript/no-non-null-assertion": "off",
+    "typescript/no-this-alias": "off",
+    "typescript/no-unsafe-declaration-merging": "off"
+  },
+  "overrides": [
+    {
+      "files": ["tests/**"],
+      "rules": {
+        "no-unreachable": "off",
+        "no-unused-expressions": "off",
+        "no-unused-vars": "off"
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+lib
+dist
+coverage/
+node_modules/
+
+npm-debug.log
+tsconfig.tsbuildinfo
+
+.DS_Store
+.idea
+.vscode
