@@ -33,8 +33,37 @@ const RESERVED_WORDS = ['prototype', 'then']
 function isSpecialProperty(prop: string | symbol): prop is symbol {
   return typeof prop === 'symbol'
     || RESERVED_WORDS.includes(prop)
-    || parseInt(prop).toString() === prop
+    || isNumberString(prop)
     || prop.startsWith('_')
+}
+
+// Property reads go through here constantly; skip `parseInt` unless the name can be a number.
+function isNumberString(prop: string) {
+  const first = prop.charCodeAt(0)
+  const couldBeNumber = (first >= 48 && first <= 57) || first === 45
+  return couldBeNumber && parseInt(prop).toString() === prop
+}
+
+// The common case of reading an injected service: no `internal/get` hooks, and the service is
+// provided by the fiber chain. Returns `missing` instead of throwing so the caller can fall back
+// to the full path, which builds the error (and its stack trace) only when it is needed.
+const missing = Symbol('missing')
+
+function fastGet(target: Context, prop: string, ctx: Context): any {
+  if (target.events._hooks['internal/get']?.length) return missing
+  const def = target.reflect.props[prop]
+  if (def?.type === 'accessor') return missing
+  if (!ctx.fiber.runtime) return ctx.reflect.get(prop, false)
+  let fiber = (ctx[symbols.shadow] as Context ?? ctx).fiber
+  const key = target[symbols.isolate][prop]
+  while (true) {
+    const impl = fiber.store?.[prop]
+    if (impl) return getTraceable(ctx, impl.value)
+    if (prop in fiber.inject) return missing
+    if (!fiber.runtime) return missing
+    if (fiber.parent[symbols.isolate][prop] !== key) return missing
+    fiber = fiber.parent.fiber
+  }
 }
 
 export type Property = Property.Service | Property.Accessor
@@ -67,6 +96,9 @@ export class ReflectService {
       if (Reflect.has(target, prop)) {
         return getTraceable(ctx, Reflect.get(target, prop, ctx))
       }
+
+      const fast = fastGet(target, prop, ctx)
+      if (fast !== missing) return fast
 
       const error = new Error(`cannot get property "${prop}" without inject`)
 

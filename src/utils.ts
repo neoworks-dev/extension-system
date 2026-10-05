@@ -138,23 +138,58 @@ function withProp(target: any, prop: string | symbol, value: any) {
   }))
 }
 
+/**
+ * Weak caches keyed by a chain of objects. The wrappers below are pure functions of their inputs,
+ * so building them once per input combination instead of on every property access or method call
+ * keeps `ctx.service.method()` from allocating several proxies per call (which dominated profiles
+ * of hot paths, especially in engines with slower proxies).
+ */
+type WeakCache = WeakMap<object, any>
+
+function cached<T>(root: WeakCache, keys: object[], create: () => T): T {
+  let level = root
+  for (const key of keys.slice(0, -1)) {
+    let next = level.get(key)
+    if (!next) {
+      next = new WeakMap()
+      level.set(key, next)
+    }
+    level = next
+  }
+  const last = keys[keys.length - 1]
+  if (level.has(last)) return level.get(last)
+  const value = create()
+  level.set(last, value)
+  return value
+}
+
+const traceables: WeakCache = new WeakMap()
+const shadows: WeakCache = new WeakMap()
+const shadowMethods: WeakCache = new WeakMap()
+
 function createShadow(ctx: Context, target: any, property: string | undefined, receiver: any) {
   if (!property) return receiver
   const origin = getPropertyDescriptor(target, property)?.value
   if (!origin) return receiver
-  return withProp(receiver, property, ctx.extend({ [symbols.shadow]: origin }))
+  return cached(shadows, [receiver, ctx, origin], () => {
+    return withProp(receiver, property, ctx.extend({ [symbols.shadow]: origin }))
+  })
 }
 
 function createShadowMethod(ctx: Context, value: any, outer: any, shadow: {}) {
-  return new Proxy(value, {
+  return cached(shadowMethods, [ctx, outer, shadow, value], () => new Proxy(value, {
     apply: (target, thisArg, args) => {
       if (thisArg === outer) thisArg = shadow
       return getTraceable(ctx, Reflect.apply(target, thisArg, args))
     },
-  })
+  }))
 }
 
 function createTraceable(ctx: Context, value: any, tracker: Tracker) {
+  return cached(traceables, [ctx, value, tracker], () => buildTraceable(ctx, value, tracker))
+}
+
+function buildTraceable(ctx: Context, value: any, tracker: Tracker) {
   const caller = (ctx[symbols.shadow] as Context | undefined) ?? ctx
   if (ctx[symbols.shadow]) {
     ctx = Object.getPrototypeOf(ctx)
