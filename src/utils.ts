@@ -1,5 +1,6 @@
 import { defineProperty } from './std'
 import type { Context, Service } from '.'
+import type { ReflectService } from './reflect'
 
 export class DisposableList<T extends WeakKey> {
   private sn = 0
@@ -132,10 +133,16 @@ export function withProps(target: any, props?: {}) {
 }
 
 function withProp(target: any, prop: string | symbol, value: any) {
-  return withProps(target, Object.defineProperty(Object.create(null), prop, {
-    value,
-    writable: false,
-  }))
+  return new Proxy(target, {
+    get: (target, key, receiver) => {
+      if (key === prop) return value
+      return Reflect.get(target, key, receiver)
+    },
+    set: (target, key, newValue, receiver) => {
+      if (key === prop) return false
+      return Reflect.set(target, key, newValue, receiver)
+    },
+  })
 }
 
 /**
@@ -146,20 +153,36 @@ function withProp(target: any, prop: string | symbol, value: any) {
  */
 type WeakCache = WeakMap<object, any>
 
-function cached<T>(root: WeakCache, keys: object[], create: () => T): T {
-  let level = root
-  for (const key of keys.slice(0, -1)) {
-    let next = level.get(key)
-    if (!next) {
-      next = new WeakMap()
-      level.set(key, next)
-    }
-    level = next
-  }
-  const last = keys[keys.length - 1]
-  if (level.has(last)) return level.get(last)
+function childCache(level: WeakCache, key: object): WeakCache {
+  let child = level.get(key)
+  if (child) return child
+  child = new WeakMap()
+  level.set(key, child)
+  return child
+}
+
+function cached3<T>(root: WeakCache, first: object, second: object, third: object, create: () => T): T {
+  const level = childCache(childCache(root, first), second)
+  const existing = level.get(third)
+  if (existing !== undefined) return existing
   const value = create()
-  level.set(last, value)
+  level.set(third, value)
+  return value
+}
+
+function cached4<T>(
+  root: WeakCache,
+  first: object,
+  second: object,
+  third: object,
+  fourth: object,
+  create: () => T,
+): T {
+  const level = childCache(childCache(childCache(root, first), second), third)
+  const existing = level.get(fourth)
+  if (existing !== undefined) return existing
+  const value = create()
+  level.set(fourth, value)
   return value
 }
 
@@ -171,13 +194,13 @@ function createShadow(ctx: Context, target: any, property: string | undefined, r
   if (!property) return receiver
   const origin = getPropertyDescriptor(target, property)?.value
   if (!origin) return receiver
-  return cached(shadows, [receiver, ctx, origin], () => {
+  return cached3(shadows, receiver, ctx, origin, () => {
     return withProp(receiver, property, ctx.extend({ [symbols.shadow]: origin }))
   })
 }
 
 function createShadowMethod(ctx: Context, value: any, outer: any, shadow: {}) {
-  return cached(shadowMethods, [ctx, outer, shadow, value], () => new Proxy(value, {
+  return cached4(shadowMethods, ctx, outer, shadow, value, () => new Proxy(value, {
     apply: (target, thisArg, args) => {
       if (thisArg === outer) thisArg = shadow
       return getTraceable(ctx, Reflect.apply(target, thisArg, args))
@@ -186,13 +209,21 @@ function createShadowMethod(ctx: Context, value: any, outer: any, shadow: {}) {
 }
 
 function createTraceable(ctx: Context, value: any, tracker: Tracker) {
-  return cached(traceables, [ctx, value, tracker], () => buildTraceable(ctx, value, tracker))
+  return cached3(traceables, ctx, value, tracker, () => buildTraceable(ctx, value, tracker))
 }
 
 function buildTraceable(ctx: Context, value: any, tracker: Tracker) {
   const caller = (ctx[symbols.shadow] as Context | undefined) ?? ctx
   if (ctx[symbols.shadow]) {
     ctx = Object.getPrototypeOf(ctx)
+  }
+  let reflect: ReflectService | undefined
+  // Reads the underlying service so the check skips the Context proxy and the traceable `reflect`.
+  const hasAssociateProp = (prop: string) => {
+    if (!tracker.associate) return false
+    reflect ??= ctx.reflect[symbols.original] as ReflectService
+    if (!reflect.hasAssociateProps(tracker.associate)) return false
+    return !!reflect.props[`${tracker.associate}.${prop}`]
   }
   const proxy = new Proxy(value, {
     get: (target, prop, receiver) => {
@@ -202,7 +233,7 @@ function buildTraceable(ctx: Context, value: any, tracker: Tracker) {
       if (typeof prop === 'symbol') {
         return Reflect.get(target, prop, receiver)
       }
-      if (tracker.associate && ctx.reflect.props[`${tracker.associate}.${prop}`]) {
+      if (hasAssociateProp(prop)) {
         return Reflect.get(ctx, `${tracker.associate}.${prop}`, withProp(ctx, symbols.receiver, receiver))
       }
       let shadow: any, innerValue: any
@@ -213,7 +244,8 @@ function buildTraceable(ctx: Context, value: any, tracker: Tracker) {
         shadow = createShadow(ctx, target, tracker.property, receiver)
         innerValue = Reflect.get(target, prop, shadow)
       }
-      const innerTracker = innerValue?.[symbols.tracker]
+      if (!isObject(innerValue)) return innerValue
+      const innerTracker = innerValue[symbols.tracker]
       if (innerTracker) {
         return createTraceable(ctx, innerValue, innerTracker)
       } else if (!tracker.noShadow && typeof innerValue === 'function') {
@@ -230,7 +262,7 @@ function buildTraceable(ctx: Context, value: any, tracker: Tracker) {
       if (typeof prop === 'symbol') {
         return Reflect.set(target, prop, value, receiver)
       }
-      if (tracker.associate && ctx.reflect.props[`${tracker.associate}.${prop}`]) {
+      if (hasAssociateProp(prop)) {
         return Reflect.set(ctx, `${tracker.associate}.${prop}`, value, withProp(ctx, symbols.receiver, receiver))
       }
       const shadow = createShadow(ctx, target, tracker.property, receiver)

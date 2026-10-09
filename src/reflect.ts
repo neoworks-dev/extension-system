@@ -167,6 +167,10 @@ export class ReflectService {
   public store: Dict<Impl, symbol> = Object.create(null)
   public props: Dict<Property> = Object.create(null)
 
+  // How many declared property names start with `<prefix>.`, for every prefix. Lets the traceable
+  // `get` trap skip the `${associate}.${prop}` lookup for services that have no associate props.
+  private associatePrefixes = new Map<string, number>()
+
   constructor(public ctx: Context) {
     defineProperty(this, symbols.tracker, {
       property: 'ctx',
@@ -177,6 +181,34 @@ export class ReflectService {
     this.mixin('fiber', ['runtime', 'effect'])
     this.mixin('registry', ['inject', 'plugin'])
     this.mixin('events', ['on', 'once', 'parallel', 'emit', 'serial', 'bail', 'waterfall'])
+  }
+
+  hasAssociateProps(associate: string) {
+    return this.associatePrefixes.has(associate)
+  }
+
+  private declareProperty(name: string, property: Property) {
+    if (!this.props[name]) this.countAssociatePrefixes(name, 1)
+    this.props[name] = property
+  }
+
+  private undeclareProperty(name: string) {
+    if (this.props[name]) this.countAssociatePrefixes(name, -1)
+    delete this.props[name]
+  }
+
+  private countAssociatePrefixes(name: string, delta: number) {
+    let dotIndex = name.indexOf('.')
+    while (dotIndex !== -1) {
+      const prefix = name.slice(0, dotIndex)
+      const count = (this.associatePrefixes.get(prefix) ?? 0) + delta
+      if (count > 0) {
+        this.associatePrefixes.set(prefix, count)
+      } else {
+        this.associatePrefixes.delete(prefix)
+      }
+      dotIndex = name.indexOf('.', dotIndex + 1)
+    }
   }
 
   get(name: string, strict = true) {
@@ -206,12 +238,10 @@ export class ReflectService {
 
   provide(name: string, value?: any, check?: () => boolean) {
     return this.ctx.fiber.effect(() => {
-      if (!this.props[name]) {
-        this.props[name] ??= { type: 'service' }
-      } else if (this.props[name].type !== 'service') {
+      if (this.props[name] && this.props[name].type !== 'service') {
         throw new Error(`property "${name}" is already declared as ${this.props[name].type}`)
       }
-      this.props[name] = { type: 'service' }
+      this.declareProperty(name, { type: 'service' })
 
       this.ctx.root[symbols.isolate][name] ??= Symbol(name)
       const key = this.ctx[symbols.isolate][name]
@@ -263,8 +293,8 @@ export class ReflectService {
       if (name in this.props) {
         throw new Error(`property "${name}" is already declared as ${this.props[name].type}`)
       }
-      this.props[name] = { type: 'accessor', ...options }
-      return () => delete this.props[name]
+      this.declareProperty(name, { type: 'accessor', ...options })
+      return () => this.undeclareProperty(name)
     }, `ctx.accessor(${JSON.stringify(name)})`)
   }
 
